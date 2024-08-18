@@ -42,3 +42,55 @@ func (p *parser) expr() (node, error) {
 
 	return exp, nil
 }
+
+func (p *parser) pselect() (node, error) {
+	if !p.expect(selectToken) {
+		return nil, errors.New("expected select keyword")
+	}
+	p.index++
+
+	sn := &selectNode{}
+	for !p.expect(fromToken) {
+		if len(sn.columns) > 0 {
+			if !p.expect(commaToken) {
+				return nil, errors.New("expected comma")
+			}
+
+			p.index++
+		}
+
+		colexpr, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+
+		sn.columns = append(sn.columns, colexpr)
+	}
+
+	if !p.expect(fromToken) {
+		return nil, errors.New("expected FROM")
+	}
+	p.index++
+
+	if !p.expect(identifierToken) {
+		return nil, errors.New("expected FROM")
+	}
+	sn.from = p.tokens[p.index]
+	p.index++
+
+	if p.expect(whereToken) {
+		p.index++
+		whereexpr, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+
+		sn.where = whereexpr
+	}
+
+	if p.index < len(p.tokens) {
+		return nil, errors.New("did not consume whole statement")
+	}
+
+	return sn, nil
+}
