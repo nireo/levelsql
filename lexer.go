@@ -61,120 +61,76 @@ type lexer struct {
 }
 
 func (l *lexer) whitespace() {
-	for i := l.index; i < len(l.content); i++ {
-		if !unicode.IsSpace(rune(l.content[i])) {
-			l.index = i
-			break
-		}
+	for l.index < len(l.content) && unicode.IsSpace(rune(l.content[l.index])) {
+		l.index++
 	}
 }
 
 func (l *lexer) keyword() token {
-	longest := 0
-	ty := selectToken
-
 	for _, b := range builtins {
-		if l.index+len(b.name) >= len(l.content) {
-			continue
-		}
-
-		if strings.EqualFold(l.content[l.index:len(b.name)], b.name) {
-			longest = len(b.name)
-			ty = b.tokType
-			break
+		if l.index+len(b.name) <= len(l.content) &&
+			strings.EqualFold(l.content[l.index:l.index+len(b.name)], b.name) {
+			l.index += len(b.name)
+			return token{tokType: b.tokType}
 		}
 	}
-
-	if longest == 0 {
-		return token{tokType: invalidToken}
-	}
-
-	l.index += longest
-	return token{tokType: ty}
+	return token{tokType: invalidToken}
 }
 
 func (l *lexer) integer() token {
 	start := l.index
-	end := l.index
-	currIdx := l.index
-
-	for l.content[currIdx] >= '0' && l.content[currIdx] <= '9' {
-		end += 1
-		currIdx += 1
+	for l.index < len(l.content) && l.content[l.index] >= '0' && l.content[l.index] <= '9' {
+		l.index++
 	}
-
-	if start == end {
+	if start == l.index {
 		return token{tokType: invalidToken}
 	}
-	l.index = end
-
-	return token{tokType: integerToken, content: l.content[start:end]}
+	return token{tokType: integerToken, content: l.content[start:l.index]}
 }
 
 func (l *lexer) str() token {
-	idx := l.index
-	if l.content[idx] != '\'' {
+	if l.index >= len(l.content) || l.content[l.index] != '\'' {
 		return token{tokType: invalidToken}
 	}
-
-	idx += 1
-
-	start := idx
-	end := idx
-
-	for l.content[idx] != '\'' {
-		end += 1
-		idx += 1
+	start := l.index + 1
+	l.index++
+	for l.index < len(l.content) && l.content[l.index] != '\'' {
+		l.index++
 	}
-
-	if l.content[idx] == '\'' {
-		idx += 1
-	}
-
-	if start == end {
+	if l.index >= len(l.content) {
 		return token{tokType: invalidToken}
 	}
-	l.index = end
-	return token{tokType: stringToken, content: l.content[start:end]}
+	l.index++ // consume closing quote
+	return token{tokType: stringToken, content: l.content[start : l.index-1]}
 }
 
 func (l *lexer) identifier() token {
 	start := l.index
-	end := l.index
-	idx := l.index
-
-	for (l.content[idx] >= 'a' && l.content[idx] <= 'z') ||
-		(l.content[idx] >= 'A' && l.content[idx] <= 'Z') ||
-		l.content[idx] == '*' {
-		end += 1
-		idx += 1
+	for l.index < len(l.content) &&
+		((l.content[l.index] >= 'a' && l.content[l.index] <= 'z') ||
+			(l.content[l.index] >= 'A' && l.content[l.index] <= 'Z') ||
+			l.content[l.index] == '*') {
+		l.index++
 	}
-
-	if start == end {
+	if start == l.index {
 		return token{tokType: invalidToken}
 	}
-	l.index = end
-
-	return token{tokType: identifierToken, content: l.content[start:end]}
+	return token{tokType: identifierToken, content: l.content[start:l.index]}
 }
 
 func (l *lexer) lex() []token {
-	l.index = 0 // ensure that at start
 	var tokens []token
-
 	lexFuncs := []func() token{
+		l.keyword,
 		l.identifier,
 		l.str,
-		l.keyword,
 		l.integer,
 	}
-
-	for {
+	for l.index < len(l.content) {
 		l.whitespace()
 		if l.index >= len(l.content) {
 			break
 		}
-
 		for _, lexFn := range lexFuncs {
 			tok := lexFn()
 			if tok.ok() {
@@ -183,6 +139,5 @@ func (l *lexer) lex() []token {
 			}
 		}
 	}
-
 	return tokens
 }
