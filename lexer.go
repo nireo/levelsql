@@ -71,7 +71,7 @@ func (l *lexer) keyword() token {
 		if l.index+len(b.name) <= len(l.content) &&
 			strings.EqualFold(l.content[l.index:l.index+len(b.name)], b.name) {
 			l.index += len(b.name)
-			return token{tokType: b.tokType}
+			return token{tokType: b.tokType, content: b.name}
 		}
 	}
 	return token{tokType: invalidToken}
