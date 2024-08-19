@@ -18,13 +18,13 @@ func (p *parser) expect(ty int) bool {
 func (p *parser) consume(ty int) bool {
 	if p.expect(ty) {
 		p.index++
+		return true
 	}
 
 	return false
 }
 
 func (p *parser) expr() (node, error) {
-	p.index = 0
 	var exp node
 	if p.expect(integerToken) || p.expect(identifierToken) || p.expect(stringToken) {
 		exp = &literalNode{lit: p.tokens[p.index]}
@@ -152,4 +152,67 @@ func (p *parser) createTable() (node, error) {
 
 	cn.columns = cols
 	return cn, nil
+}
+
+func (p *parser) insert() (node, error) {
+	p.index = 0
+	if !p.consume(insertToken) {
+		return nil, errors.New("expected insert into keyword")
+	}
+
+	if !p.expect(identifierToken) {
+		return nil, errors.New("expected identifier after insert into")
+	}
+
+	in := &insertNode{
+		table: p.tokens[p.index],
+	}
+	p.index++
+
+	if !p.consume(valuesToken) {
+		return nil, errors.New("expected values token")
+	}
+
+	if !p.consume(leftParenToken) {
+		return nil, errors.New("expected left paren")
+	}
+
+	var values []node
+	for !p.expect(rightParenToken) {
+		if len(values) > 0 {
+			if !p.consume(commaToken) {
+				return nil, errors.New("expected comma")
+			}
+		}
+
+		v, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+
+		values = append(values, v)
+	}
+	p.index++
+
+	if p.index < len(p.tokens) {
+		return nil, errors.New("did not parse whole token stream")
+	}
+	in.values = values
+	return in, nil
+}
+
+func (p *parser) parse() (node, error) {
+	if p.expect(selectToken) {
+		return p.pselect()
+	}
+
+	if p.expect(createTableToken) {
+		return p.createTable()
+	}
+
+	if p.expect(insertToken) {
+		return p.insert()
+	}
+
+	return nil, errors.New("unrecognized statement")
 }

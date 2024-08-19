@@ -85,3 +85,24 @@ func (c *createTableNode) String() string {
 	b.WriteString(")\n")
 	return b.String()
 }
+
+type insertNode struct {
+	table  token
+	values []node
+}
+
+func (i *insertNode) String() string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("INSERT INTO %s VALUES(", i.table.content))
+	for idx, val := range i.values {
+		b.WriteString(val.String())
+		if idx < len(i.values)-1 {
+			b.WriteRune(',')
+		}
+	}
+
+	b.WriteString(")\n")
+
+	return b.String()
+}
