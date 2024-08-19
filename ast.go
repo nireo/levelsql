@@ -1,6 +1,9 @@
 package boltsql
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // this file contains a simple ast representation for sql. ast nodes have a debug string function
 
@@ -55,4 +58,30 @@ type literalNode struct {
 
 func (l *literalNode) String() string {
 	return l.lit.content
+}
+
+type createTableColumn struct {
+	name token
+	kind token
+}
+
+type createTableNode struct {
+	table   token
+	columns []createTableColumn
+}
+
+func (c *createTableNode) String() string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", c.table.content))
+
+	for i, col := range c.columns {
+		b.WriteString(col.name.content + " " + col.kind.content)
+		if i < len(c.columns)-1 {
+			b.WriteRune(',')
+		}
+		b.WriteRune('\n')
+	}
+	b.WriteString(")\n")
+	return b.String()
 }

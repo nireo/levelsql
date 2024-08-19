@@ -15,7 +15,16 @@ func (p *parser) expect(ty int) bool {
 	return p.tokens[p.index].tokType == ty
 }
 
+func (p *parser) consume(ty int) bool {
+	if p.expect(ty) {
+		p.index++
+	}
+
+	return false
+}
+
 func (p *parser) expr() (node, error) {
+	p.index = 0
 	var exp node
 	if p.expect(integerToken) || p.expect(identifierToken) || p.expect(stringToken) {
 		exp = &literalNode{lit: p.tokens[p.index]}
@@ -44,19 +53,17 @@ func (p *parser) expr() (node, error) {
 }
 
 func (p *parser) pselect() (node, error) {
-	if !p.expect(selectToken) {
+	p.index = 0
+	if !p.consume(selectToken) {
 		return nil, errors.New("expected select keyword")
 	}
-	p.index++
 
 	sn := &selectNode{}
 	for !p.expect(fromToken) {
 		if len(sn.columns) > 0 {
-			if !p.expect(commaToken) {
+			if !p.consume(commaToken) {
 				return nil, errors.New("expected comma")
 			}
-
-			p.index++
 		}
 
 		colexpr, err := p.expr()
@@ -67,10 +74,9 @@ func (p *parser) pselect() (node, error) {
 		sn.columns = append(sn.columns, colexpr)
 	}
 
-	if !p.expect(fromToken) {
+	if !p.consume(fromToken) {
 		return nil, errors.New("expected FROM")
 	}
-	p.index++
 
 	if !p.expect(identifierToken) {
 		return nil, errors.New("expected FROM")
@@ -93,4 +99,57 @@ func (p *parser) pselect() (node, error) {
 	}
 
 	return sn, nil
+}
+
+func (p *parser) createTable() (node, error) {
+	p.index = 0
+
+	if !p.consume(createTableToken) {
+		return nil, errors.New("expected CREATE TABLE keyword")
+	}
+
+	if !p.expect(identifierToken) {
+		return nil, errors.New("expected create table name")
+	}
+
+	var cols []createTableColumn
+	cn := &createTableNode{
+		table: p.tokens[p.index],
+	}
+	p.index++
+
+	if !p.consume(leftParenToken) {
+		return nil, errors.New("expected opening paren")
+	}
+
+	for !p.expect(rightParenToken) {
+		if len(cols) > 0 {
+			if !p.consume(commaToken) {
+				return nil, errors.New("expected comma")
+			}
+		}
+
+		col := createTableColumn{}
+		if !p.expect(identifierToken) {
+			return nil, errors.New("expected identifier")
+		}
+		col.name = p.tokens[p.index]
+		p.index++
+
+		if !p.expect(identifierToken) {
+			return nil, errors.New("expected identifier")
+		}
+		col.kind = p.tokens[p.index]
+		p.index++
+
+		cols = append(cols, col)
+	}
+
+	p.index++
+	if p.index < len(p.tokens) {
+		return nil, errors.New("didn't read whole token stream")
+	}
+
+	cn.columns = cols
+	return cn, nil
 }
