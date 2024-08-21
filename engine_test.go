@@ -2,6 +2,7 @@ package boltsql
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -160,4 +161,80 @@ func TestStorage(t *testing.T) {
 			})
 		}
 	})
+}
+
+type mockStorage struct {
+	tables map[string]*table
+	rows   map[string][]*row
+}
+
+func (ms *mockStorage) getTable(name string) (*table, error) {
+	table, ok := ms.tables[name]
+	if !ok {
+		return nil, fmt.Errorf("table not found")
+	}
+
+	return table, nil
+}
+
+func (ms *mockStorage) getRowIterator(tableName string) (*RowIterator, error) {
+	rows, ok := ms.rows[tableName]
+	if !ok {
+		return nil, fmt.Errorf("table not found")
+	}
+	return &RowIterator{rows: rows, current: -1}, nil
+}
+
+type RowIterator struct {
+	rows    []*row
+	current int
+}
+
+func (ri *RowIterator) Next() (*row, bool) {
+	ri.current++
+	if ri.current < len(ri.rows) {
+		return ri.rows[ri.current], true
+	}
+	return nil, false
+}
+
+func (ri *RowIterator) Close() {}
+
+func setupTestData() *mockStorage {
+	ms := &mockStorage{
+		tables: make(map[string]*table),
+		rows:   make(map[string][]*row),
+	}
+
+	ms.tables["users"] = &table{
+		Name:    "users",
+		Columns: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+		Types:   []string{"integer", "string", "integer"},
+	}
+
+	ms.rows["users"] = []*row{
+		{
+			Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+			Cells: []value{
+				{ty: integerVal, integerVal: 1},
+				{ty: stringVal, stringVal: "Alice"},
+				{ty: integerVal, integerVal: 30},
+			},
+		},
+		{
+			Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+			Cells: []value{
+				{ty: integerVal, integerVal: 2},
+				{ty: stringVal, stringVal: "Bob"},
+				{ty: integerVal, integerVal: 25},
+			},
+		},
+	}
+
+	return ms
+}
+
+func TestExecuteSelect(t *testing.T) {
+	ms := setupTestData()
+	e := &exec{storage: ms}
 }

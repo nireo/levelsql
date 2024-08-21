@@ -118,19 +118,36 @@ func deserializeValue(b []byte) value {
 	}
 }
 
-type Storage struct {
+type storageIterator interface {
+	Next() (*row, bool)
+	Close() error
+}
+
+type storage interface {
+	getTable(name string) (*table, error)
+	writeRow(table string, row *row) error
+	getRowIterator(table string) (storageIterator, error)
+	Close() error
+}
+
+type leveldbStorage struct {
 	db *leveldb.DB
 }
 
-func NewStorage(dbPath string) (*Storage, error) {
+type leveldbRowIterator struct {
+	iter   iterator.Iterator
+	fields [][]byte
+}
+
+func NewStorage(dbPath string) (storage, error) {
 	db, err := leveldb.OpenFile(dbPath, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &Storage{db: db}, nil
+	return &leveldbStorage{db: db}, nil
 }
 
-func (s *Storage) Close() error {
+func (s *leveldbStorage) Close() error {
 	return s.db.Close()
 }
 
@@ -159,7 +176,7 @@ func (r *row) Get(field []byte) value {
 	return value{ty: nullVal}
 }
 
-func (s *Storage) writeRow(table string, row *row) error {
+func (s *leveldbStorage) writeRow(table string, row *row) error {
 	key := make([]byte, 16)
 	rand.Read(key)
 	keyPrefix := fmt.Sprintf("row_%s_", table)
@@ -177,12 +194,7 @@ func (s *Storage) writeRow(table string, row *row) error {
 	return s.db.Put(fullKey, value, nil)
 }
 
-type rowIterator struct {
-	iter   iterator.Iterator
-	fields [][]byte
-}
-
-func (ri *rowIterator) Next() (*row, bool) {
+func (ri *leveldbRowIterator) Next() (*row, bool) {
 	if !ri.iter.Next() {
 		return nil, false
 	}
@@ -201,11 +213,12 @@ func (ri *rowIterator) Next() (*row, bool) {
 	return row, true
 }
 
-func (ri *rowIterator) Close() {
+func (ri *leveldbRowIterator) Close() error {
 	ri.iter.Release()
+	return nil
 }
 
-func (s *Storage) getRowIterator(table string) (*rowIterator, error) {
+func (s *leveldbStorage) getRowIterator(table string) (storageIterator, error) {
 	prefix := []byte(fmt.Sprintf("row_%s_", table))
 	iter := s.db.NewIterator(util.BytesPrefix(prefix), nil)
 
@@ -215,7 +228,7 @@ func (s *Storage) getRowIterator(table string) (*rowIterator, error) {
 		return nil, err
 	}
 
-	return &rowIterator{
+	return &leveldbRowIterator{
 		iter:   iter,
 		fields: tableInfo.Columns,
 	}, nil
@@ -227,7 +240,7 @@ type table struct {
 	Types   []string
 }
 
-func (s *Storage) writeTable(table *table) error {
+func (s *leveldbStorage) writeTable(table *table) error {
 	key := []byte(fmt.Sprintf("tbl_%s_", table.Name))
 	var value []byte
 	for i, column := range table.Columns {
@@ -246,7 +259,7 @@ func (s *Storage) writeTable(table *table) error {
 	return s.db.Put(key, value, nil)
 }
 
-func (s *Storage) getTable(name string) (*table, error) {
+func (s *leveldbStorage) getTable(name string) (*table, error) {
 	key := []byte(fmt.Sprintf("tbl_%s_", name))
 	value, err := s.db.Get(key, nil)
 	if err == leveldb.ErrNotFound {
@@ -280,7 +293,7 @@ func (s *Storage) getTable(name string) (*table, error) {
 }
 
 type exec struct {
-	storage *Storage
+	storage storage
 }
 
 type queryResponse struct {
