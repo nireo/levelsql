@@ -1,4 +1,4 @@
-module github.com/nireo/boltsql
+module github.com/nireo/levelsql
 
 go 1.21.10
 

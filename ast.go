@@ -1,4 +1,4 @@
-package boltsql
+package levelsql
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 )
 
 // this file contains a simple ast representation for sql. ast nodes have a debug string function
-
 type node interface {
 	String() string
 }

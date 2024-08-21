@@ -1,4 +1,4 @@
-package boltsql
+package levelsql
 
 import "testing"
 
