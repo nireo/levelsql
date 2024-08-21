@@ -126,6 +126,7 @@ type storageIterator interface {
 type storage interface {
 	getTable(name string) (*table, error)
 	writeRow(table string, row *row) error
+	writeTable(table *table) error
 	getRowIterator(table string) (storageIterator, error)
 	Close() error
 }

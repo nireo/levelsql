@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -234,7 +235,73 @@ func setupTestData() *mockStorage {
 	return ms
 }
 
-func TestExecuteSelect(t *testing.T) {
-	ms := setupTestData()
-	e := &exec{storage: ms}
+func TestExecuteExpression(t *testing.T) {
+	e := &exec{}
+	row := &row{
+		Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+		Cells: []value{
+			{ty: integerVal, integerVal: 1},
+			{ty: stringVal, stringVal: "Alice"},
+			{ty: integerVal, integerVal: 30},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		expr    node
+		want    value
+		wantErr bool
+	}{
+		{
+			name:    "Literal integer",
+			expr:    &literalNode{lit: token{tokType: integerToken, content: "42"}},
+			want:    value{ty: integerVal, integerVal: 42},
+			wantErr: false,
+		},
+		{
+			name:    "Literal string",
+			expr:    &literalNode{lit: token{tokType: stringToken, content: "hello"}},
+			want:    value{ty: stringVal, stringVal: "hello"},
+			wantErr: false,
+		},
+		{
+			name:    "Identifier",
+			expr:    &literalNode{lit: token{tokType: identifierToken, content: "name"}},
+			want:    value{ty: stringVal, stringVal: "Alice"},
+			wantErr: false,
+		},
+		{
+			name: "Equal operation (true)",
+			expr: &binopNode{
+				left:  &literalNode{lit: token{tokType: identifierToken, content: "age"}},
+				op:    token{tokType: equalToken},
+				right: &literalNode{lit: token{tokType: integerToken, content: "30"}},
+			},
+			want:    value{ty: boolVal, boolVal: true},
+			wantErr: false,
+		},
+		{
+			name: "Equal operation (false)",
+			expr: &binopNode{
+				left:  &literalNode{lit: token{tokType: identifierToken, content: "age"}},
+				op:    token{tokType: equalToken},
+				right: &literalNode{lit: token{tokType: integerToken, content: "25"}},
+			},
+			want:    value{ty: boolVal, boolVal: false},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := e.executeExpression(tt.expr, row)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("executeExpression() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("executeExpression() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
