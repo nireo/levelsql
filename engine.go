@@ -420,3 +420,59 @@ func (e *exec) executeSelect(sn *selectNode) (*queryResponse, error) {
 
 	return resp, nil
 }
+
+func (e *exec) executeCreateTable(cn *createTableNode) (*queryResponse, error) {
+	cols := make([][]byte, 0, len(cn.columns))
+	types := make([]string, 0, len(cn.columns))
+
+	for _, col := range cn.columns {
+		cols = append(cols, []byte(col.name.content))
+		types = append(types, col.kind.content)
+	}
+
+	table := &table{
+		Name:    cn.table.content,
+		Types:   types,
+		Columns: cols,
+	}
+
+	err := e.storage.writeTable(table)
+	if err != nil {
+		return nil, err
+	}
+
+	return &queryResponse{empty: true}, nil
+}
+
+func (e *exec) executeInsert(in *insertNode) (*queryResponse, error) {
+	emptyRow := &row{}
+	resRow := &row{}
+	for _, val := range in.values {
+		expr, err := e.executeExpression(val, emptyRow)
+		if err != nil {
+			return nil, err
+		}
+
+		resRow.Append(expr)
+	}
+
+	err := e.storage.writeRow(in.table.content, resRow)
+	if err != nil {
+		return nil, err
+	}
+
+	return &queryResponse{empty: true}, nil
+}
+
+func (e *exec) execute(n node) (*queryResponse, error) {
+	switch astNode := n.(type) {
+	case *insertNode:
+		return e.executeInsert(astNode)
+	case *createTableNode:
+		return e.executeCreateTable(astNode)
+	case *selectNode:
+		return e.executeSelect(astNode)
+	default:
+		return nil, errors.New("executing a non-parent node")
+	}
+}
