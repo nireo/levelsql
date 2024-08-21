@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -23,6 +25,55 @@ type value struct {
 	boolVal    bool
 	stringVal  string
 	integerVal int64
+}
+
+func (v value) asBool() bool {
+	switch v.ty {
+	case nullVal:
+		return false
+	case boolVal:
+		return v.boolVal
+	case stringVal:
+		return len(v.stringVal) > 0
+	case integerVal:
+		return v.integerVal != 0
+	default:
+		return false
+	}
+}
+
+func (v value) asStr() string {
+	switch v.ty {
+	case nullVal:
+		return ""
+	case boolVal:
+		return strconv.FormatBool(v.boolVal)
+	case stringVal:
+		return v.stringVal
+	case integerVal:
+		return strconv.FormatInt(v.integerVal, 10)
+	default:
+		return ""
+	}
+}
+
+func (v value) asInt() int64 {
+	switch v.ty {
+	case nullVal:
+		return 0
+	case boolVal:
+		if v.boolVal {
+			return 1
+		}
+		return 0
+	case stringVal:
+		i, _ := strconv.ParseInt(v.stringVal, 10, 64)
+		return i
+	case integerVal:
+		return v.integerVal
+	default:
+		return 0
+	}
 }
 
 func (v value) bytes() []byte {
@@ -154,7 +205,7 @@ func (ri *rowIterator) Close() {
 	ri.iter.Release()
 }
 
-func (s *Storage) GetrowIterator(table string) (*rowIterator, error) {
+func (s *Storage) getRowIterator(table string) (*rowIterator, error) {
 	prefix := []byte(fmt.Sprintf("row_%s_", table))
 	iter := s.db.NewIterator(util.BytesPrefix(prefix), nil)
 
@@ -226,4 +277,132 @@ func (s *Storage) getTable(name string) (*table, error) {
 	}
 
 	return table, nil
+}
+
+type exec struct {
+	storage *Storage
+}
+
+type queryResponse struct {
+	fields []string
+	rows   [][]string
+	empty  bool
+}
+
+func (e *exec) executeBinop(binop *binopNode, row *row) (value, error) {
+	lhs, err := e.executeExpression(binop.left, row)
+	if err != nil {
+		return value{}, nil
+	}
+
+	rhs, err := e.executeExpression(binop.right, row)
+	if err != nil {
+		return value{}, nil
+	}
+
+	if binop.op.tokType == equalToken {
+		// TODO: rhs and lhs different types
+		if rhs.ty != lhs.ty {
+			return value{}, errors.New("equaling for different types")
+		}
+
+		switch lhs.ty {
+		case nullVal:
+			return value{ty: boolVal, boolVal: true}, nil
+		case boolVal:
+			return value{ty: boolVal, boolVal: lhs.boolVal == rhs.boolVal}, nil
+		case stringVal:
+			return value{ty: boolVal, boolVal: lhs.stringVal == rhs.stringVal}, nil
+		case integerVal:
+			return value{ty: boolVal, boolVal: lhs.integerVal == rhs.integerVal}, nil
+		}
+	}
+
+	return value{ty: nullVal}, nil
+}
+
+func (e *exec) executeExpression(expr node, row *row) (value, error) {
+	switch parsedNode := expr.(type) {
+	case *literalNode:
+		litToken := parsedNode.lit
+		switch litToken.tokType {
+		case integerToken:
+			convertedNum, err := strconv.Atoi(litToken.content)
+			if err != nil {
+				return value{}, nil
+			}
+			return value{ty: integerVal, integerVal: int64(convertedNum)}, nil
+		case stringToken:
+			return value{ty: stringVal, stringVal: litToken.content}, nil
+		case identifierToken:
+			return row.Get([]byte(litToken.content)), nil
+		default:
+			return value{}, nil
+		}
+	case *binopNode:
+		return e.executeBinop(parsedNode, row)
+	}
+
+	return value{}, nil
+}
+
+func (e *exec) executeSelect(sn *selectNode) (*queryResponse, error) {
+	_, err := e.storage.getTable(sn.from.content)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get table: %s", err)
+	}
+
+	requestedFields := make([]string, 0, len(sn.columns))
+	for _, col := range sn.columns {
+		lit, ok := col.(*literalNode)
+		if !ok {
+			continue
+		}
+
+		if lit.lit.tokType == identifierToken {
+			requestedFields = append(requestedFields, lit.lit.content)
+		}
+	}
+
+	resp := &queryResponse{
+		fields: requestedFields,
+		empty:  false,
+	}
+
+	iter, err := e.storage.getRowIterator(sn.from.content)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get row iterator")
+	}
+	defer iter.Close()
+
+	row, ok := iter.Next()
+	for ok {
+		add := false
+		if sn.where != nil {
+			val, err := e.executeExpression(sn.where, row)
+			if err != nil {
+				return nil, fmt.Errorf("something went wrong when executing where: %s", err)
+			}
+
+			add = val.asBool()
+		} else {
+			add = true
+		}
+
+		if add {
+			var rowRes []string
+			for _, col := range sn.columns {
+				val, err := e.executeExpression(col, row)
+				if err != nil {
+					return nil, fmt.Errorf("error executing expression: %s", err)
+				}
+
+				rowRes = append(rowRes, val.asStr())
+			}
+
+			resp.rows = append(resp.rows, rowRes)
+		}
+	}
+
+	return resp, nil
 }
