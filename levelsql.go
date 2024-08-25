@@ -25,7 +25,7 @@ func (d *DB) Close() error {
 	return d.executor.storage.Close()
 }
 
-func (d *DB) Execute(query string) (*queryResponse, error) {
+func (d *DB) Execute(query string) (*QueryResponse, error) {
 	lexer := lexer{
 		index:   0,
 		content: query,

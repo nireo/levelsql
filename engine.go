@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -297,10 +298,42 @@ type exec struct {
 	storage storage
 }
 
-type queryResponse struct {
+type QueryResponse struct {
 	fields []string
 	rows   [][]string
 	empty  bool
+}
+
+func (qr *QueryResponse) String() string {
+	if qr.empty {
+		return "ok"
+	}
+
+	var b strings.Builder
+	b.WriteString("| ")
+
+	for _, field := range qr.fields {
+		b.WriteString(field)
+		b.WriteString("\t\t|")
+	}
+	b.WriteByte('\n')
+
+	b.WriteString("+ ")
+	for _, field := range qr.fields {
+		b.WriteString(strings.Repeat("=", len(field)) + "\t\t+")
+	}
+	b.WriteByte('\n')
+
+	for _, row := range qr.rows {
+		b.WriteString("| ")
+		for _, cell := range row {
+			b.WriteString(cell)
+			b.WriteString("\t\t|")
+		}
+		b.WriteByte('\n')
+	}
+
+	return b.String()
 }
 
 func (e *exec) executeBinop(binop *binopNode, row *row) (value, error) {
@@ -360,7 +393,7 @@ func (e *exec) executeExpression(expr node, row *row) (value, error) {
 	return value{}, nil
 }
 
-func (e *exec) executeSelect(sn *selectNode) (*queryResponse, error) {
+func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 	_, err := e.storage.getTable(sn.from.content)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get table: %s", err)
@@ -378,7 +411,7 @@ func (e *exec) executeSelect(sn *selectNode) (*queryResponse, error) {
 		}
 	}
 
-	resp := &queryResponse{
+	resp := &QueryResponse{
 		fields: requestedFields,
 		empty:  false,
 	}
@@ -421,7 +454,7 @@ func (e *exec) executeSelect(sn *selectNode) (*queryResponse, error) {
 	return resp, nil
 }
 
-func (e *exec) executeCreateTable(cn *createTableNode) (*queryResponse, error) {
+func (e *exec) executeCreateTable(cn *createTableNode) (*QueryResponse, error) {
 	cols := make([][]byte, 0, len(cn.columns))
 	types := make([]string, 0, len(cn.columns))
 
@@ -441,10 +474,10 @@ func (e *exec) executeCreateTable(cn *createTableNode) (*queryResponse, error) {
 		return nil, err
 	}
 
-	return &queryResponse{empty: true}, nil
+	return &QueryResponse{empty: true}, nil
 }
 
-func (e *exec) executeInsert(in *insertNode) (*queryResponse, error) {
+func (e *exec) executeInsert(in *insertNode) (*QueryResponse, error) {
 	emptyRow := &row{}
 	resRow := &row{}
 	for _, val := range in.values {
@@ -461,10 +494,10 @@ func (e *exec) executeInsert(in *insertNode) (*queryResponse, error) {
 		return nil, err
 	}
 
-	return &queryResponse{empty: true}, nil
+	return &QueryResponse{empty: true}, nil
 }
 
-func (e *exec) execute(n node) (*queryResponse, error) {
+func (e *exec) execute(n node) (*QueryResponse, error) {
 	switch astNode := n.(type) {
 	case *insertNode:
 		return e.executeInsert(astNode)
