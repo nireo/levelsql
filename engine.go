@@ -449,6 +449,8 @@ func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 
 			resp.rows = append(resp.rows, rowRes)
 		}
+
+		row, ok = iter.Next()
 	}
 
 	return resp, nil

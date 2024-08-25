@@ -1,6 +1,9 @@
 package levelsql
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestParser_Expression(t *testing.T) {
 	tests := []struct {
@@ -15,7 +18,8 @@ func TestParser_Expression(t *testing.T) {
 		{"Concat expression", "first || ' ' || last_name", false, "first   last"},
 	}
 
-	for _, tc := range tests {
+	for i, tc := range tests {
+		fmt.Println(i)
 		l := lexer{
 			content: tc.input,
 			index:   0,
