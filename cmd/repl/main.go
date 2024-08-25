@@ -26,8 +26,10 @@ func main() {
 	}
 	defer db.Close()
 
+	fmt.Printf(">> ")
 	bufioReader := bufio.NewScanner(os.Stdin)
 	for bufioReader.Scan() {
+
 		res, err := db.Execute(bufioReader.Text())
 		if err != nil {
 			fmt.Printf("error executing query: %s", err)
@@ -35,5 +37,6 @@ func main() {
 		}
 
 		fmt.Println(res.String())
+		fmt.Printf(">> ")
 	}
 }
