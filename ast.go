@@ -17,6 +17,26 @@ type binopNode struct {
 	op token
 }
 
+type functionCallNode struct {
+	args []node
+	name token
+}
+
+func (f *functionCallNode) String() string {
+	var b strings.Builder
+	b.WriteString(f.name.content)
+	b.WriteByte('(')
+	for idx, arg := range f.args {
+		b.WriteString(arg.String())
+		if idx < len(f.args)-1 {
+			b.WriteString(", ")
+		}
+	}
+	b.WriteByte(')')
+
+	return b.String()
+}
+
 func (b *binopNode) String() string {
 	return b.left.String() + " " + b.op.content + " " + b.right.String()
 }

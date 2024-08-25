@@ -31,7 +31,14 @@ func (p *parser) consume(ty int) bool {
 
 func (p *parser) expr() (node, error) {
 	var exp node
+	canBeFunction := false
+	callerToken := token{}
 	if p.expect(integerToken) || p.expect(identifierToken) || p.expect(stringToken) {
+		if p.tokens[p.index].tokType == identifierToken {
+			canBeFunction = true
+			callerToken = p.tokens[p.index]
+		}
+
 		exp = &literalNode{lit: p.tokens[p.index]}
 		p.index++
 	} else {
@@ -52,9 +59,42 @@ func (p *parser) expr() (node, error) {
 
 		binExp.right = rhs
 		exp = binExp
+	} else if p.expect(leftParenToken) && canBeFunction {
+		return p.parseFuncCall(callerToken)
 	}
 
 	return exp, nil
+}
+
+func (p *parser) parseFuncCall(callerToken token) (node, error) {
+	callNode := &functionCallNode{
+		name: callerToken,
+	}
+
+	if !p.consume(leftParenToken) {
+		return nil, errors.New("need parenthesis before call arguments")
+	}
+
+	for !p.expect(rightParenToken) {
+		if len(callNode.args) > 0 {
+			if !p.consume(commaToken) {
+				return nil, errors.New("expected comma")
+			}
+		}
+
+		colexpr, err := p.expr()
+		if err != nil {
+			return nil, err
+		}
+
+		callNode.args = append(callNode.args, colexpr)
+	}
+
+	if !p.consume(rightParenToken) {
+		return nil, errors.New("expected closing call")
+	}
+
+	return callNode, nil
 }
 
 func (p *parser) pselect() (node, error) {

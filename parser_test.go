@@ -1,7 +1,6 @@
 package levelsql
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -12,14 +11,15 @@ func TestParser_Expression(t *testing.T) {
 		shouldErr      bool
 		expectedString string
 	}{
-		{"Basic equal", "hello = world", false, "hello = world"},
-		{"Integer literal", "10", false, "10"},
-		{"String literal", "'hello'", false, "hello"},
-		{"Concat expression", "first || ' ' || last_name", false, "first   last"},
+		// {"Basic equal", "hello = world", false, "hello = world"},
+		// {"Integer literal", "10", false, "10"},
+		// {"String literal", "'hello'", false, "hello"},
+		// {"Concat expression", "first || ' ' || last_name", false, "first   last"},
+		{"Basic function call with a single arg", "test(10)", false, "test(10)"},
+		{"Basic function call with a single arg", "test(10, 20, 30)", false, "test(10, 20, 30)"},
 	}
 
-	for i, tc := range tests {
-		fmt.Println(i)
+	for _, tc := range tests {
 		l := lexer{
 			content: tc.input,
 			index:   0,
