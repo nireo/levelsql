@@ -7,6 +7,11 @@ type parser struct {
 	index  int
 }
 
+func (p *parser) reset(newTokens []token) {
+	p.tokens = newTokens
+	p.index = 0
+}
+
 func (p *parser) expect(ty int) bool {
 	if p.index >= len(p.tokens) {
 		return false
