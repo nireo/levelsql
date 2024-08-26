@@ -1,7 +1,6 @@
 package levelsql
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -139,7 +138,7 @@ type leveldbStorage struct {
 
 type leveldbRowIterator struct {
 	iter   iterator.Iterator
-	fields [][]byte
+	fields []string
 }
 
 func NewStorage(dbPath string) (storage, error) {
@@ -155,7 +154,7 @@ func (s *leveldbStorage) Close() error {
 }
 
 type row struct {
-	Fields [][]byte
+	Fields []string
 	Cells  []value
 }
 
@@ -163,7 +162,7 @@ type row struct {
 var rowPool = sync.Pool{
 	New: func() interface{} {
 		return &row{
-			Fields: make([][]byte, 0),
+			Fields: make([]string, 0),
 			Cells:  make([]value, 0),
 		}
 	},
@@ -179,7 +178,7 @@ func putRow(r *row) {
 	rowPool.Put(r)
 }
 
-func newRow(fields [][]byte) *row {
+func newRow(fields []string) *row {
 	r := getRow()
 	r.reset(fields)
 
@@ -190,7 +189,7 @@ func (r *row) Release() {
 	putRow(r)
 }
 
-func (r *row) reset(fields [][]byte) {
+func (r *row) reset(fields []string) {
 	r.Fields = r.Fields[:0]
 	r.Fields = append(r.Fields, fields...)
 	r.Cells = r.Cells[:0]
@@ -200,9 +199,9 @@ func (r *row) Append(v value) {
 	r.Cells = append(r.Cells, v)
 }
 
-func (r *row) Get(field []byte) value {
+func (r *row) Get(field string) value {
 	for i, f := range r.Fields {
-		if bytes.Equal(f, field) {
+		if f == field {
 			return r.Cells[i]
 		}
 	}
@@ -269,7 +268,7 @@ func (s *leveldbStorage) getRowIterator(table string) (storageIterator, error) {
 
 type table struct {
 	Name    string
-	Columns [][]byte
+	Columns []string
 	Types   []string
 }
 
@@ -303,7 +302,7 @@ func (s *leveldbStorage) getTable(name string) (*table, error) {
 
 	table := &table{
 		Name:    name,
-		Columns: make([][]byte, 0),
+		Columns: make([]string, 0),
 		Types:   make([]string, 0),
 	}
 
@@ -313,7 +312,7 @@ func (s *leveldbStorage) getTable(name string) (*table, error) {
 		offset += 8
 		column := value[offset : offset+int(colLen)]
 		offset += int(colLen)
-		table.Columns = append(table.Columns, column)
+		table.Columns = append(table.Columns, string(column))
 
 		typeLen := binary.BigEndian.Uint64(value[offset : offset+8])
 		offset += 8
@@ -397,7 +396,7 @@ func (e *exec) executeBinop(binop *binopNode, row *row) (value, error) {
 	}
 
 	if binop.op.tokType == ltToken {
-
+		return value{ty: boolVal, boolVal: lhs.asInt() < rhs.asInt()}, nil
 	}
 
 	return value{ty: nullVal}, nil
@@ -428,7 +427,7 @@ func (e *exec) executeLiteral(l *literalNode, row *row) (value, error) {
 	case stringToken:
 		return value{ty: stringVal, stringVal: litToken.content}, nil
 	case identifierToken:
-		return row.Get([]byte(litToken.content)), nil
+		return row.Get(litToken.content), nil
 	default:
 		return value{}, nil
 	}
@@ -510,11 +509,11 @@ func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 }
 
 func (e *exec) executeCreateTable(cn *createTableNode) (*QueryResponse, error) {
-	cols := make([][]byte, 0, len(cn.columns))
+	cols := make([]string, 0, len(cn.columns))
 	types := make([]string, 0, len(cn.columns))
 
 	for _, col := range cn.columns {
-		cols = append(cols, []byte(col.name.content))
+		cols = append(cols, col.name.content)
 		types = append(types, col.kind.content)
 	}
 

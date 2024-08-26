@@ -1,7 +1,6 @@
 package levelsql
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -23,7 +22,7 @@ func TestStorage(t *testing.T) {
 	// Test table operations
 	t.Run("Table Operations", func(t *testing.T) {
 		tableName := "test_table"
-		columns := [][]byte{[]byte("id"), []byte("name"), []byte("age")}
+		columns := []string{"id", "name", "age"}
 		types := []string{"integer", "string", "integer"}
 
 		table := &table{
@@ -51,7 +50,7 @@ func TestStorage(t *testing.T) {
 		}
 
 		for i, col := range retrievedTable.Columns {
-			if !bytes.Equal(col, columns[i]) {
+			if col != columns[i] {
 				t.Errorf("Expected column %s, got %s", columns[i], col)
 			}
 		}
@@ -69,7 +68,7 @@ func TestStorage(t *testing.T) {
 
 	t.Run("Row Operations", func(t *testing.T) {
 		tableName := "test_table"
-		columns := [][]byte{[]byte("id"), []byte("name"), []byte("age")}
+		columns := []string{"id", "name", "age"}
 
 		row := newRow(columns)
 		row.Append(value{ty: integerVal, integerVal: 1})
@@ -108,17 +107,17 @@ func TestStorage(t *testing.T) {
 			t.Errorf("Expected age 30, got %d", retrievedRow.Cells[2].integerVal)
 		}
 
-		idVal := retrievedRow.Get([]byte("id"))
+		idVal := retrievedRow.Get("id")
 		if idVal.ty != integerVal || idVal.integerVal != 1 {
 			t.Errorf("Expected id 1, got %d", idVal.integerVal)
 		}
 
-		nameVal := retrievedRow.Get([]byte("name"))
+		nameVal := retrievedRow.Get("name")
 		if nameVal.ty != stringVal || nameVal.stringVal != "Alice" {
 			t.Errorf("Expected name Alice, got %s", nameVal.stringVal)
 		}
 
-		ageVal := retrievedRow.Get([]byte("age"))
+		ageVal := retrievedRow.Get("age")
 		if ageVal.ty != integerVal || ageVal.integerVal != 30 {
 			t.Errorf("Expected age 30, got %d", ageVal.integerVal)
 		}
@@ -209,13 +208,13 @@ func setupTestData() *mockStorage {
 
 	ms.tables["users"] = &table{
 		Name:    "users",
-		Columns: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+		Columns: []string{"id", "name", "age"},
 		Types:   []string{"integer", "string", "integer"},
 	}
 
 	ms.rows["users"] = []*row{
 		{
-			Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+			Fields: []string{"id", "name", "age"},
 			Cells: []value{
 				{ty: integerVal, integerVal: 1},
 				{ty: stringVal, stringVal: "Alice"},
@@ -223,7 +222,7 @@ func setupTestData() *mockStorage {
 			},
 		},
 		{
-			Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+			Fields: []string{"id", "name", "age"},
 			Cells: []value{
 				{ty: integerVal, integerVal: 2},
 				{ty: stringVal, stringVal: "Bob"},
@@ -238,7 +237,7 @@ func setupTestData() *mockStorage {
 func TestExecuteExpression(t *testing.T) {
 	e := &exec{}
 	row := &row{
-		Fields: [][]byte{[]byte("id"), []byte("name"), []byte("age")},
+		Fields: []string{"id", "name", "age"},
 		Cells: []value{
 			{ty: integerVal, integerVal: 1},
 			{ty: stringVal, stringVal: "Alice"},
