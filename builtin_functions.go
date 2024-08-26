@@ -5,7 +5,13 @@ import (
 	"strings"
 )
 
-type builtinFunc func(exec *exec, row *row, args []node) (value, error)
+// we need this because without it there is a circular dependency using the exec
+// struct directly.
+type expressionExecutor interface {
+	executeExpression(expr node, row *row) (value, error)
+}
+
+type builtinFunc func(exec expressionExecutor, row *row, args []node) (value, error)
 
 var builtinFuncs = map[string]builtinFunc{
 	"lower":      builtinLower,
@@ -13,7 +19,7 @@ var builtinFuncs = map[string]builtinFunc{
 	"equal_fold": builtinEqualFold,
 }
 
-func builtinLower(exec *exec, row *row, args []node) (value, error) {
+func builtinLower(exec expressionExecutor, row *row, args []node) (value, error) {
 	if len(args) != 1 {
 		return value{}, fmt.Errorf("lower takes 1 argument, got: %d", len(args))
 	}
@@ -29,7 +35,7 @@ func builtinLower(exec *exec, row *row, args []node) (value, error) {
 	}, nil
 }
 
-func builtinUpper(exec *exec, row *row, args []node) (value, error) {
+func builtinUpper(exec expressionExecutor, row *row, args []node) (value, error) {
 	if len(args) != 1 {
 		return value{}, fmt.Errorf("upper takes 1 argument, got: %d", len(args))
 	}
@@ -45,7 +51,7 @@ func builtinUpper(exec *exec, row *row, args []node) (value, error) {
 	}, nil
 }
 
-func builtinEqualFold(exec *exec, row *row, args []node) (value, error) {
+func builtinEqualFold(exec expressionExecutor, row *row, args []node) (value, error) {
 	if len(args) != 2 {
 		return value{}, fmt.Errorf("equalFold takes 2 arguments, got: %d", len(args))
 	}
