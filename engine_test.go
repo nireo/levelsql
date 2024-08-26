@@ -68,9 +68,11 @@ func TestStorage(t *testing.T) {
 
 	t.Run("Row Operations", func(t *testing.T) {
 		tableName := "test_table"
-		columns := []string{"id", "name", "age"}
+		fakeTable := &table{
+			Columns: []string{"id", "name", "age"},
+		}
 
-		row := newRow(columns)
+		row := newRow(fakeTable)
 		row.Append(value{ty: integerVal, integerVal: 1})
 		row.Append(value{ty: stringVal, stringVal: "Alice"})
 		row.Append(value{ty: integerVal, integerVal: 30})
@@ -212,9 +214,13 @@ func setupTestData() *mockStorage {
 		Types:   []string{"integer", "string", "integer"},
 	}
 
+	testTable := &table{
+		Columns: []string{"id", "name", "age"},
+	}
+
 	ms.rows["users"] = []*row{
 		{
-			Fields: []string{"id", "name", "age"},
+			table: testTable,
 			Cells: []value{
 				{ty: integerVal, integerVal: 1},
 				{ty: stringVal, stringVal: "Alice"},
@@ -222,7 +228,7 @@ func setupTestData() *mockStorage {
 			},
 		},
 		{
-			Fields: []string{"id", "name", "age"},
+			table: testTable,
 			Cells: []value{
 				{ty: integerVal, integerVal: 2},
 				{ty: stringVal, stringVal: "Bob"},
@@ -235,9 +241,13 @@ func setupTestData() *mockStorage {
 }
 
 func TestExecuteExpression(t *testing.T) {
+	testTable := &table{
+		Columns: []string{"id", "name", "age"},
+	}
+
 	e := &exec{}
 	row := &row{
-		Fields: []string{"id", "name", "age"},
+		table: testTable,
 		Cells: []value{
 			{ty: integerVal, integerVal: 1},
 			{ty: stringVal, stringVal: "Alice"},

@@ -137,8 +137,8 @@ type leveldbStorage struct {
 }
 
 type leveldbRowIterator struct {
-	iter   iterator.Iterator
-	fields []string
+	table *table
+	iter  iterator.Iterator
 }
 
 func NewStorage(dbPath string) (storage, error) {
@@ -154,16 +154,16 @@ func (s *leveldbStorage) Close() error {
 }
 
 type row struct {
-	Fields []string
-	Cells  []value
+	table *table
+	Cells []value
 }
 
 // rows are often allocated a lot so reduce the amount of allocations
 var rowPool = sync.Pool{
 	New: func() interface{} {
 		return &row{
-			Fields: make([]string, 0),
-			Cells:  make([]value, 0),
+			table: nil,
+			Cells: make([]value, 0),
 		}
 	},
 }
@@ -173,14 +173,14 @@ func getRow() *row {
 }
 
 func putRow(r *row) {
-	r.Fields = r.Fields[:0]
+	r.table = nil
 	r.Cells = r.Cells[:0]
 	rowPool.Put(r)
 }
 
-func newRow(fields []string) *row {
+func newRow(table *table) *row {
 	r := getRow()
-	r.reset(fields)
+	r.reset(table)
 
 	return r
 }
@@ -189,9 +189,8 @@ func (r *row) Release() {
 	putRow(r)
 }
 
-func (r *row) reset(fields []string) {
-	r.Fields = r.Fields[:0]
-	r.Fields = append(r.Fields, fields...)
+func (r *row) reset(t *table) {
+	r.table = t
 	r.Cells = r.Cells[:0]
 }
 
@@ -200,7 +199,7 @@ func (r *row) Append(v value) {
 }
 
 func (r *row) Get(field string) value {
-	for i, f := range r.Fields {
+	for i, f := range r.table.Columns {
 		if f == field {
 			return r.Cells[i]
 		}
@@ -231,7 +230,7 @@ func (ri *leveldbRowIterator) Next() (*row, bool) {
 		return nil, false
 	}
 	value := ri.iter.Value()
-	row := newRow(ri.fields)
+	row := newRow(ri.table)
 
 	offset := 0
 	for offset < len(value) {
@@ -261,8 +260,8 @@ func (s *leveldbStorage) getRowIterator(table string) (storageIterator, error) {
 	}
 
 	return &leveldbRowIterator{
-		iter:   iter,
-		fields: tableInfo.Columns,
+		table: tableInfo,
+		iter:  iter,
 	}, nil
 }
 
