@@ -2,6 +2,7 @@ package levelsql
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 )
@@ -61,5 +62,134 @@ func BenchmarkSelect(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to select: %v", err)
 		}
+	}
+}
+
+func setupTestDB(t *testing.T) (*DB, func()) {
+	dbPath := fmt.Sprintf("test_db_%d", rand.Int31())
+	db, err := OpenDB(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+
+	cleanup := func() {
+		db.Close()
+		os.RemoveAll(dbPath)
+	}
+
+	return db, cleanup
+}
+
+func TestCreateTable(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.Execute("CREATE TABLE users (id INTEGER, name STRING, age INTEGER)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+}
+
+func TestInsert(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.Execute("CREATE TABLE users (id INTEGER, name STRING, age INTEGER)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Execute("INSERT INTO users VALUES (1, 'Alice', 30)")
+	if err != nil {
+		t.Fatalf("Failed to insert row: %v", err)
+	}
+}
+
+func TestSelect(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.Execute("CREATE TABLE users (id INTEGER, name STRING, age INTEGER)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Execute("INSERT INTO users VALUES (1, 'Alice', 30)")
+	if err != nil {
+		t.Fatalf("Failed to insert row: %v", err)
+	}
+
+	result, err := db.Execute("SELECT name, age FROM users WHERE id = 1")
+	if err != nil {
+		t.Fatalf("Failed to select: %v", err)
+	}
+
+	if len(result.rows) != 1 {
+		t.Fatalf("Expected 1 row, got %d", len(result.rows))
+	}
+
+	if result.rows[0][0] != "Alice" || result.rows[0][1] != "30" {
+		t.Fatalf("Unexpected result: %v", result.rows[0])
+	}
+}
+
+func TestMultipleInsertAndSelect(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.Execute("CREATE TABLE users (id INTEGER, name STRING, age INTEGER)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Execute("INSERT INTO users VALUES (1, 'Alice', 30)")
+	if err != nil {
+		t.Fatalf("Failed to insert row: %v", err)
+	}
+
+	_, err = db.Execute("INSERT INTO users VALUES (2, 'Bob', 25)")
+	if err != nil {
+		t.Fatalf("Failed to insert row: %v", err)
+	}
+
+	result, err := db.Execute("SELECT name FROM users WHERE age = 30")
+	if err != nil {
+		t.Fatalf("Failed to select: %v", err)
+	}
+
+	if len(result.rows) != 1 {
+		t.Fatalf("Expected 1 row, got %d", len(result.rows))
+	}
+
+	if result.rows[0][0] != "Alice" {
+		t.Fatalf("Unexpected result: %v", result.rows[0])
+	}
+}
+
+func TestFunctionInSelect(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.Execute("CREATE TABLE users (id INTEGER, name STRING, age INTEGER)")
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = db.Execute("INSERT INTO users VALUES (1, 'Alice', 30)")
+	if err != nil {
+		t.Fatalf("Failed to insert row: %v", err)
+	}
+
+	result, err := db.Execute("SELECT CONCAT(name, '_suffix') FROM users WHERE id = 1")
+	if err != nil {
+		t.Fatalf("Failed to select with function: %v", err)
+	}
+
+	if len(result.rows) != 1 {
+		t.Fatalf("Expected 1 row, got %d", len(result.rows))
+	}
+
+	if result.rows[0][0] != "Alice_suffix" {
+		t.Fatalf("Unexpected result: %v", result.rows[0])
 	}
 }

@@ -18,6 +18,7 @@ var builtinFuncs = map[string]builtinFunc{
 	"upper":         builtinUpper,
 	"equal_fold":    builtinEqualFold,
 	"string_repeat": builtinStringRepeat,
+	"concat":        builtinConcat,
 }
 
 func executeArgs(exec expressionExecutor, row *row, args []node) ([]value, error) {
@@ -94,6 +95,22 @@ func builtinStringRepeat(exec expressionExecutor, row *row, args []node) (value,
 
 	return value{
 		stringVal: strings.Repeat(vals[0].asStr(), int(vals[1].asInt())),
+		ty:        stringVal,
+	}, nil
+}
+
+func builtinConcat(exec expressionExecutor, row *row, args []node) (value, error) {
+	if len(args) != 2 {
+		return value{}, fmt.Errorf("concat takes 2 arguments, got %d", len(args))
+	}
+
+	vals, err := executeArgs(exec, row, args)
+	if err != nil {
+		return value{}, err
+	}
+
+	return value{
+		stringVal: vals[0].asStr() + vals[1].asStr(),
 		ty:        stringVal,
 	}, nil
 }

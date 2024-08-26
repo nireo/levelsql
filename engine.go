@@ -396,6 +396,10 @@ func (e *exec) executeBinop(binop *binopNode, row *row) (value, error) {
 		}
 	}
 
+	if binop.op.tokType == ltToken {
+
+	}
+
 	return value{ty: nullVal}, nil
 }
 
@@ -431,7 +435,7 @@ func (e *exec) executeLiteral(l *literalNode, row *row) (value, error) {
 }
 
 func (e *exec) executeFunctionCall(fcn *functionCallNode, row *row) (value, error) {
-	fn, ok := builtinFuncs[fcn.name.content]
+	fn, ok := builtinFuncs[strings.ToLower(fcn.name.content)]
 	if !ok {
 		return value{}, fmt.Errorf("function was not found: %s", fcn.name.content)
 	}
@@ -474,6 +478,7 @@ func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 		if sn.where != nil {
 			val, err := e.executeExpression(sn.where, row)
 			if err != nil {
+				row.Release()
 				return nil, fmt.Errorf("something went wrong when executing where: %s", err)
 			}
 
@@ -487,6 +492,7 @@ func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 			for _, col := range sn.columns {
 				val, err := e.executeExpression(col, row)
 				if err != nil {
+					row.Release()
 					return nil, fmt.Errorf("error executing expression: %s", err)
 				}
 

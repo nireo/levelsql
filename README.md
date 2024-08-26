@@ -19,14 +19,12 @@ ok
 + =====         +=====          +
 | 1             |yes            |
 | 2             |no             |
-
->> 
 ```
 
 ## Benchmarks
 
 ```
-goos: linux
+Goos: linux
 goarch: amd64
 pkg: github.com/nireo/levelsql
 cpu: AMD Ryzen 5 5600X 6-Core Processor             
