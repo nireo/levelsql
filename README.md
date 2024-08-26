@@ -22,3 +22,7 @@ ok
 
 >> 
 ```
+
+## Supported features
+
+[x] Built-in functions
