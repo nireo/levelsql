@@ -14,9 +14,24 @@ type expressionExecutor interface {
 type builtinFunc func(exec expressionExecutor, row *row, args []node) (value, error)
 
 var builtinFuncs = map[string]builtinFunc{
-	"lower":      builtinLower,
-	"upper":      builtinUpper,
-	"equal_fold": builtinEqualFold,
+	"lower":         builtinLower,
+	"upper":         builtinUpper,
+	"equal_fold":    builtinEqualFold,
+	"string_repeat": builtinStringRepeat,
+}
+
+func executeArgs(exec expressionExecutor, row *row, args []node) ([]value, error) {
+	values := make([]value, 0, len(args))
+	for _, expr := range args {
+		executed, err := exec.executeExpression(expr, row)
+		if err != nil {
+			return nil, err
+		}
+
+		values = append(values, executed)
+	}
+
+	return values, nil
 }
 
 func builtinLower(exec expressionExecutor, row *row, args []node) (value, error) {
@@ -53,21 +68,32 @@ func builtinUpper(exec expressionExecutor, row *row, args []node) (value, error)
 
 func builtinEqualFold(exec expressionExecutor, row *row, args []node) (value, error) {
 	if len(args) != 2 {
-		return value{}, fmt.Errorf("equalFold takes 2 arguments, got: %d", len(args))
+		return value{}, fmt.Errorf("equal_fold takes 2 arguments, got: %d", len(args))
 	}
 
-	vala, err := exec.executeExpression(args[0], row)
-	if err != nil {
-		return value{}, err
-	}
-
-	valb, err := exec.executeExpression(args[1], row)
+	vals, err := executeArgs(exec, row, args)
 	if err != nil {
 		return value{}, err
 	}
 
 	return value{
-		boolVal: strings.EqualFold(vala.asStr(), valb.asStr()),
+		boolVal: strings.EqualFold(vals[0].asStr(), vals[1].asStr()),
 		ty:      boolVal,
+	}, nil
+}
+
+func builtinStringRepeat(exec expressionExecutor, row *row, args []node) (value, error) {
+	if len(args) != 2 {
+		return value{}, fmt.Errorf("string_repeat takes 2 arguments, got: %d", len(args))
+	}
+
+	vals, err := executeArgs(exec, row, args)
+	if err != nil {
+		return value{}, err
+	}
+
+	return value{
+		stringVal: strings.Repeat(vals[0].asStr(), int(vals[1].asInt())),
+		ty:        stringVal,
 	}, nil
 }

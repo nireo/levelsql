@@ -303,6 +303,22 @@ func TestExecuteExpression(t *testing.T) {
 			want:    value{ty: stringVal, stringVal: "alice"},
 			wantErr: false,
 		},
+		{
+			name: "Function call repeat string",
+			expr: &functionCallNode{
+				name: token{tokType: identifierToken, content: "string_repeat"},
+				args: []node{
+					&literalNode{
+						lit: token{tokType: identifierToken, content: "name"},
+					},
+					&literalNode{
+						lit: token{tokType: integerToken, content: "3"},
+					},
+				},
+			},
+			want:    value{ty: stringVal, stringVal: "AliceAliceAlice"},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
