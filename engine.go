@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -158,11 +159,41 @@ type row struct {
 	Cells  []value
 }
 
+// rows are often allocated a lot so reduce the amount of allocations
+var rowPool = sync.Pool{
+	New: func() interface{} {
+		return &row{
+			Fields: make([][]byte, 0),
+			Cells:  make([]value, 0),
+		}
+	},
+}
+
+func getRow() *row {
+	return rowPool.Get().(*row)
+}
+
+func putRow(r *row) {
+	r.Fields = r.Fields[:0]
+	r.Cells = r.Cells[:0]
+	rowPool.Put(r)
+}
+
 func newRow(fields [][]byte) *row {
-	return &row{
-		Fields: fields,
-		Cells:  make([]value, 0, len(fields)),
-	}
+	r := getRow()
+	r.reset(fields)
+
+	return r
+}
+
+func (r *row) Release() {
+	putRow(r)
+}
+
+func (r *row) reset(fields [][]byte) {
+	r.Fields = r.Fields[:0]
+	r.Fields = append(r.Fields, fields...)
+	r.Cells = r.Cells[:0]
 }
 
 func (r *row) Append(v value) {
@@ -465,6 +496,7 @@ func (e *exec) executeSelect(sn *selectNode) (*QueryResponse, error) {
 			resp.rows = append(resp.rows, rowRes)
 		}
 
+		row.Release()
 		row, ok = iter.Next()
 	}
 

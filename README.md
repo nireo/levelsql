@@ -30,7 +30,7 @@ goos: linux
 goarch: amd64
 pkg: github.com/nireo/levelsql
 cpu: AMD Ryzen 5 5600X 6-Core Processor             
-BenchmarkInsert-12    	  245182	      5428 ns/op	    1329 B/op	      29 allocs/op
-BenchmarkSelect-12    	    3804	    408066 ns/op	  187352 B/op	    3069 allocs/op
+BenchmarkInsert-12    	  248124	      5454 ns/op	    1329 B/op	      29 allocs/op
+BenchmarkSelect-12    	    5863	    195029 ns/op	   11282 B/op	    1069 allocs/op
 PASS
 ```
