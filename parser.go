@@ -261,3 +261,11 @@ func (p *parser) parse() (node, error) {
 
 	return nil, errors.New("unrecognized statement")
 }
+
+func (p *parser) peek() token {
+	return p.tokens[p.index]
+}
+
+func (p *parser) prev() token {
+	return p.tokens[p.index-1]
+}
