@@ -38,7 +38,21 @@ func (f *functionCallNode) String() string {
 }
 
 func (b *binopNode) String() string {
-	return b.left.String() + " " + b.op.content + " " + b.right.String()
+	op := b.op.content
+	if op == "" {
+		switch b.op.tokType {
+		case plusToken:
+			op = "+"
+		case equalToken:
+			op = "="
+		case ltToken:
+			op = "<"
+		case concattoken:
+			op = "||"
+		}
+	}
+
+	return b.left.String() + " " + op + " " + b.right.String()
 }
 
 type selectNode struct {
@@ -92,7 +106,7 @@ type createTableNode struct {
 func (c *createTableNode) String() string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", c.table.content))
+	fmt.Fprintf(&b, "CREATE TABLE %s (\n", c.table.content)
 
 	for i, col := range c.columns {
 		b.WriteString(col.name.content + " " + col.kind.content)
@@ -113,14 +127,13 @@ type insertNode struct {
 func (i *insertNode) String() string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("INSERT INTO %s VALUES(", i.table.content))
+	fmt.Fprintf(&b, "INSERT INTO %s VALUES(", i.table.content)
 	for idx, val := range i.values {
 		b.WriteString(val.String())
 		if idx < len(i.values)-1 {
 			b.WriteRune(',')
 		}
 	}
-
 	b.WriteString(")\n")
 
 	return b.String()
